@@ -135,7 +135,7 @@ async function pipeBytes(bytes, stream) {
 }
 function trimSdp(sdp) {
   // keep only lines a data-channel connection needs
-  return sdp.split('\r\n').filter(l => l && !/^a=(extmap|rtcp-fb|ssrc|msid-semantic)/.test(l)).join('\r\n') + '\r\n';
+  return sdp.split('\r\n').filter(l => l && !/^a=(extmap|rtcp-fb|ssrc|msid-semantic|ice-options)/.test(l)).map(l => l.replace(/ generation \d+ network-cost \d+$/, '')).join('\r\n') + '\r\n';
 }
 async function encodeCode(kind, from, to, sdp) {
   const raw = new TextEncoder().encode(trimSdp(sdp)), head = 'LRB' + kind + from + to;
@@ -181,7 +181,7 @@ const Pair = {
         <h2>🦙🦙 Play Together</h2>
         <p class="pair-msg"></p>
         <div class="pair-row">
-          <div class="pair-cell"><canvas class="pair-qr" width="300" height="300"></canvas><span>My code</span></div>
+          <div class="pair-cell"><canvas class="pair-qr" width="600" height="600"></canvas><span>My code</span></div>
           <div class="pair-cell"><video class="pair-cam" playsinline muted autoplay></video><span>My camera</span></div>
         </div>
         <p class="pair-tip">Both devices need the same Wi-Fi.</p>
@@ -218,12 +218,12 @@ const Pair = {
   showCode(code) {
     this.codeBox.value = code;
     const c = this.qr.getContext('2d');
-    c.fillStyle = '#fff'; c.fillRect(0, 0, 300, 300);
-    if (!window.qrcode) { c.fillStyle = '#000'; c.font = '16px sans-serif'; c.fillText('QR maker missing:', 20, 140); c.fillText('use copy and paste', 20, 164); return; }
+    c.fillStyle = '#fff'; c.fillRect(0, 0, 600, 600);
+    if (!window.qrcode) { c.fillStyle = '#000'; c.font = '32px sans-serif'; c.fillText('QR maker missing:', 40, 280); c.fillText('use copy and paste', 40, 328); return; }
     const qr = window.qrcode(0, 'L');
     qr.addData(code);
     qr.make();
-    const n = qr.getModuleCount(), cell = Math.floor(276 / n), off = Math.floor((300 - cell * n) / 2);
+    const n = qr.getModuleCount(), cell = Math.floor(568 / n), off = Math.floor((600 - cell * n) / 2);  // big, crisp squares for the camera
     c.fillStyle = '#000';
     for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) if (qr.isDark(r, col)) c.fillRect(off + col * cell, off + r * cell, cell, cell);
   },
