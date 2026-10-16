@@ -3,6 +3,7 @@
 
 const Bay = {
   stick: true,
+  bg: '#3a4157',
   st: {
     mine:  { r: R(110, 150, 160, 84), label: '⛏️ Mine Rocks' },
     bench: { r: R(330, 150, 170, 80), label: '🔧 Workbench' },

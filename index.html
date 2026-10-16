@@ -29,14 +29,23 @@
     .pair-qr { background: #fff; object-fit: contain; }
     .pair-cam { background: #000; transform: scaleX(-1); }
     [hidden] { display: none !important; }
+    html, body { touch-action: manipulation; }
+    #rotate { display: none; position: fixed; inset: 0; z-index: 20; background: #070917; color: #ffe066;
+      font-size: 30px; line-height: 1.5; text-align: center; align-items: center; justify-content: center; padding: 24px; }
+    @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+    #update { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 15; font: inherit; font-size: 20px;
+      padding: 12px 22px; border: 3px solid #2a1800; border-radius: 16px; background: #ffe066; color: #2a1800; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
     .pair-manual { margin-top: 10px; text-align: left; font-size: 14px; color: #aab4d4; }
     .pair-manual textarea { width: 100%; box-sizing: border-box; font-size: 11px; margin-top: 6px; -webkit-user-select: text; user-select: text; }
   </style>
 </head>
 <body>
   <canvas id="game" aria-label="Llama Rocket Builder game"></canvas>
+  <div id="rotate">📱🔄<br>Turn your phone sideways to play!</div>
+  <button id="update" hidden>✨ New version! Tap to get it</button>
   <script src="js/vendor/qrcode.js"></script>
   <script src="js/vendor/jsQR.js"></script>
+  <script src="js/version.js"></script>
   <script src="js/core.js"></script>
   <script src="js/data.js"></script>
   <script src="js/art.js"></script>

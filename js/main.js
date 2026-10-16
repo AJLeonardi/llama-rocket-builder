@@ -2,6 +2,7 @@
 /* Title screen and the main game loop. */
 
 const Title = {
+  wide: true,
   enter() { this.t = 0; this.confirmReset = 0; },
   update(dt) {
     this.t += dt;
@@ -12,14 +13,14 @@ const Title = {
     const t = this.t;
     ctx.fillStyle = '#070a22'; ctx.fillRect(0, 0, W, H);
     drawStars(t * 40);
-    PLANETS.forEach((p, i) => drawPlanet(240 + i * 120, 560 + Math.sin(t + i) * 5, 22 + i * 3, i));
+    PLANETS.forEach((p, i) => drawPlanet(W / 2 - 240 + i * 120, 560 + Math.sin(t + i) * 5, 22 + i * 3, i));
     drawPlanet(110, 120, 40, -1);
     const demo = { cells: { '1,0': 'nose', '1,1': 'cockpit', '1,2': 'body', '0,2': 'wing', '2,2': 'wing', '1,3': 'engine2' }, color: 0 };
     drawRocketDesign(demo, W / 2 + Math.sin(t * 0.8) * 320, 360 + Math.sin(t * 1.6) * 16, { s: 24, flame: 1, tilt: Math.cos(t * 0.8) * 0.3 });
     text('LLAMA', W / 2, 105, { size: 76, color: '#ffe066', stroke: '#3a1d00', strokeW: 10 });
     text('ROCKET BUILDER', W / 2, 178, { size: 58, color: '#ff8a1f', stroke: '#3a1d00', strokeW: 10 });
-    drawLlama(150, 330, { s: 1.6, scarf: PLAYER_SCARF[0], t, moving: true });
-    drawLlama(810, 330, { s: 1.6, scarf: PLAYER_SCARF[1], t: t + 0.3, moving: true, face: -1 });
+    drawLlama(W / 2 - 330, 330, { s: 1.6, scarf: PLAYER_SCARF[0], t, moving: true });
+    drawLlama(W / 2 + 330, 330, { s: 1.6, scarf: PLAYER_SCARF[1], t: t + 0.3, moving: true, face: -1 });
     if (button('▶ Play', W / 2 - 270, 400, 250, 66, { size: 26 })) goTo('house', { from: 'start' });
     if (button(Net.connected ? '✅ Connected!' : '🦙🦙 Play Together', W / 2 + 20, 400, 250, 66, { size: 22, color: '#9fd3ff' })) Pair.open();
     text(Net.connected ? `You are ${Net.role === 'host' ? 'Llama 1 🧡' : 'Llama 2 💙'} · tap Play!` : 'Play Together = two iPads/iPhones on the same Wi-Fi', W / 2, 490, { size: 15, color: '#aab4d4' });
@@ -33,36 +34,52 @@ const Title = {
 
 Object.assign(SCENES, { title: Title, house: House, bay: Bay, builder: Builder, launch: Launch, space: Space, planet: PlanetScene, win: Win });
 game.save = loadSave() || newSave();
+fitCanvas();
 goTo('title');
+
+// Scenes marked `wide` use the whole (possibly wider) canvas. Others are drawn on the 960-wide stage in the middle,
+// with `bg` (a colour, or a function drawing on the full canvas) filling the sides.
+function drawSceneBg(scene) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (typeof scene.bg === 'function') scene.bg();
+  else { ctx.fillStyle = scene.bg || '#070917'; ctx.fillRect(0, 0, CW, H); }
+}
 
 let last = performance.now(), saveT = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   game.t += dt;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ui.consumed = false;
   beginInputFrame();
+  setLayer(!!game.scene.wide);
   if (pressed.KeyM) { Sfx.muted = !Sfx.muted; toast(Sfx.muted ? '🔇 Sound off' : '🔊 Sound on'); }
   if (pressed.Escape && game.modal && game.modal.closable !== false) { game.modal = null; delete pressed.Escape; }
   if (!game.modal) game.scene.update(dt);
   updateParticles(dt);
   Net.tick();
+  const sceneNow = game.scene;
+  drawSceneBg(sceneNow);
+  setLayer(!!sceneNow.wide);
   ctx.save();
   if (game.shake > 0) { ctx.translate(rand(-1, 1) * game.shake, rand(-1, 1) * game.shake); game.shake = Math.max(0, game.shake - dt * 30); }
   ui.locked = !!game.modal;
-  const sceneNow = game.scene;
   sceneNow.draw(dt);
   ctx.restore();
   ui.locked = false;
   if (game.modal) {
-    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, 0, W, H);
+    setLayer(true);
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, 0, CW, H);
+    setLayer(false);                 // menus are laid out on the 960 stage
     game.modal.draw(dt);
   }
+  setLayer(!!game.scene.wide);
   drawParticles();
   drawFloaters(dt);
+  setLayer(true);
   drawToasts(dt);
-  if (game.fade > 0) { ctx.fillStyle = `rgba(0,0,0,${game.fade})`; ctx.fillRect(0, 0, W, H); game.fade = Math.max(0, game.fade - dt * 2.5); }
+  drawBuildNumber();
+  if (game.fade > 0) { ctx.fillStyle = `rgba(0,0,0,${game.fade})`; ctx.fillRect(0, 0, CW, H); game.fade = Math.max(0, game.fade - dt * 2.5); }
   saveT += dt;
   if (saveT > 2) { saveT = 0; saveGame(); }
   endInputFrame();
@@ -70,4 +87,29 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.addEventListener('pagehide', saveGame);
+
+// ---------- Build number + "new version" button ----------
+function drawBuildNumber() {
+  text(`build ${BUILD}`, CW - 8, H - 8, { size: 11, align: 'right', color: 'rgba(255,255,255,.4)', bold: false });
+}
+async function checkForUpdate() {
+  if (BUILD === 'dev') return;
+  try {
+    const res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    const v = await res.json();
+    if (String(v.build) !== String(BUILD)) document.getElementById('update').hidden = false;
+  } catch (e) { /* offline: try again later */ }
+}
+document.getElementById('update').addEventListener('click', async () => {
+  saveGame();
+  try {
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    if (reg) await reg.update();
+  } catch (e) { /* reload anyway */ }
+  location.reload();
+});
+checkForUpdate();
+setInterval(checkForUpdate, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });

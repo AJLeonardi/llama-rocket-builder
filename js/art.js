@@ -159,11 +159,12 @@ function rocketSize(design, s) {
 }
 
 // ---------- Space things ----------
-const STARS = Array.from({ length: 170 }, () => ({ x: Math.random() * W, y: Math.random() * H, z: Math.random() }));
+const STARS = Array.from({ length: 250 }, () => ({ x: Math.random() * 1400, y: Math.random() * H, z: Math.random() }));
 function drawStars(scroll = 0, alpha = 1, streak = 0) {
   ctx.fillStyle = '#fff';
   ctx.strokeStyle = '#fff';
   for (const st of STARS) {
+    if (st.x > W) continue;
     const y = (((st.y + scroll * (0.2 + st.z * 0.8)) % H) + H) % H;
     ctx.globalAlpha = alpha * (0.3 + st.z * 0.7);
     if (streak) {

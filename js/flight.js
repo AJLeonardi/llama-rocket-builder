@@ -6,12 +6,13 @@ function canFlyTo(idx, tier) { return idx < PLANETS.length && tier >= PLANETS[id
 
 // ---------- Takeoff ----------
 const Launch = {
+  wide: true,
   enter(arg) {
     this.startLeg = arg.startLeg || 0;
     this.a = analyzeRocket(game.save.design);
     this.t = 0; this.alt = 0; this.vel = 0; this.beeps = {};
     this.exploded = false;
-    this.clouds = Array.from({ length: 14 }, (_, i) => ({ x: rand(-50, W), h: 420 + i * 260 + rand(0, 120), w: rand(90, 180) }));
+    this.clouds = Array.from({ length: 14 }, (_, i) => ({ x: rand(-50, CW), h: 420 + i * 260 + rand(0, 120), w: rand(90, 180) }));
     if (!this.a.boom && this.a.wobble > 0.7) toast('This rocket looks wobbly... hold on! 🪽', '#ffb3b3');
   },
   rocketY() { return 505 - Math.min(this.alt, 180); },
@@ -114,13 +115,14 @@ function makeBoomModal(reason) {
 // ---------- Space flight ----------
 const Space = {
   stick: true,
+  wide: true,
   BASE_Y: 470,
   enter(arg) {
     this.leg = arg.leg || 0;
     this.design = game.save.design;
     this.a = analyzeRocket(this.design);
     this.speed = 200 + this.a.tier * 40 + Math.min(2, this.a.speed) * 25;
-    this.r = { x: W / 2, y: this.BASE_Y, vx: 0, vy: 0, hull: 3, inv: 1.5, crashed: 0, tilt: 0, wt: rand(0, 10), flash: 0 };
+    this.r = { x: CW / 2, y: this.BASE_Y, vx: 0, vy: 0, hull: 3, inv: 1.5, crashed: 0, tilt: 0, wt: rand(0, 10), flash: 0 };
     this.lost = [];
     this.debris = [];
     this.shieldFlash = [0, 0];
@@ -139,14 +141,15 @@ const Space = {
     const rnd = seeded(Net.seed * 7 + leg * 1013 + 1);
     this.ast = [];
     for (let d = 700; d < this.len - 300;) {
-      const a = makeAsteroid(60 + rnd() * (W - 120), 0, 14 + rnd() * 18 + leg * 2, rnd);
-      a.wd = d; a.x0 = a.x; a.drift = (rnd() - 0.5) * 0.25;
+      const nx = rnd();   // 0..1 across the screen, so every screen width (and both devices) get the same field
+      const a = makeAsteroid(0, 0, 14 + rnd() * 18 + leg * 2, rnd);
+      a.wd = d; a.nx = nx; a.drift = (rnd() - 0.5) * 0.25;
       this.ast.push(a);
       d += (90 + rnd() * 170) / (1 + leg * 0.3);
     }
     this.picks = [];
     for (let d = 500; d < this.len - 300; d += 260 + rnd() * 260) {
-      this.picks.push({ wd: d, x: 70 + rnd() * (W - 140), kind: rnd() < 0.5 ? 'tokens' : ['stone', 'metal', 'gold', 'diamond'][Math.floor(rnd() * rnd() * 4)], b: rnd() * 6 });
+      this.picks.push({ wd: d, nx: rnd(), x: 0, kind: rnd() < 0.5 ? 'tokens' : ['stone', 'metal', 'gold', 'diamond'][Math.floor(rnd() * rnd() * 4)], b: rnd() * 6 });
     }
   },
   screenY(wd) { return this.BASE_Y - (wd - this.dist); },
@@ -163,7 +166,7 @@ const Space = {
     if (this.state === 'arrive' && this.st > 2.2) { this.state = 'prompt'; game.modal = makePlanetPrompt(this.leg); }
     this.updateRocket(dt);
     this.updateThings(dt);
-    Net.sendPos({ scene: 'space', leg: this.leg, dist: this.dist + (this.BASE_Y - this.r.y), x: this.r.x, tilt: this.r.tilt });
+    Net.sendPos({ scene: 'space', leg: this.leg, dist: this.dist + (this.BASE_Y - this.r.y), nx: this.r.x / W, tilt: this.r.tilt });
   },
   updateRocket(dt) {
     const r = this.r;
@@ -206,7 +209,8 @@ const Space = {
   },
   updateThings(dt) {
     const r = this.r;
-    for (const a of this.ast) { a.rot += a.vr * dt; a.x = a.x0 + a.drift * (this.dist - a.wd + 600); a.y = this.screenY(a.wd); }
+    for (const a of this.ast) { a.rot += a.vr * dt; a.x = 60 + a.nx * (W - 120) + a.drift * (this.dist - a.wd + 600); a.y = this.screenY(a.wd); }
+    for (const p of this.picks) p.x = 70 + p.nx * (W - 140);
     for (const d of this.debris) { d.x += d.vx * dt; d.y += d.vy * dt; d.rot += d.vr * dt; d.vy += 200 * dt; }
     this.debris = this.debris.filter(d => d.y < H + 80);
     if (r.crashed > 0) return;
@@ -342,11 +346,11 @@ const Space = {
     const f = Net.friend;
     if (!Net.connected || !f || f.scene !== 'space' || f.leg !== this.leg) return;
     const y = this.BASE_Y - (f.dist - this.dist);
-    const scarf = Net.friendScarf();
-    if (y < 40) { text(`▲ ${Net.friendName()} is ahead!`, clamp(f.x, 90, W - 90), 130, { size: 14, color: scarf, stroke: '#000', strokeW: 4 }); return; }
-    if (y > H + 20) { text(`▼ ${Net.friendName()} is behind`, clamp(f.x, 90, W - 90), H - 20, { size: 14, color: scarf, stroke: '#000', strokeW: 4 }); return; }
-    if (f.design) drawRocketDesign(f.design, f.x, y, { s: this.S, flame: 1, tilt: f.tilt || 0, alpha: 0.7 });
-    text(Net.friendName(), f.x, y + 22, { size: 13, color: scarf, stroke: '#000', strokeW: 3 });
+    const scarf = Net.friendScarf(), fx = (f.nx || 0.5) * W;
+    if (y < 40) { text(`▲ ${Net.friendName()} is ahead!`, clamp(fx, 90, W - 90), 130, { size: 14, color: scarf, stroke: '#000', strokeW: 4 }); return; }
+    if (y > H + 20) { text(`▼ ${Net.friendName()} is behind`, clamp(fx, 90, W - 90), H - 20, { size: 14, color: scarf, stroke: '#000', strokeW: 4 }); return; }
+    if (f.design) drawRocketDesign(f.design, fx, y, { s: this.S, flame: 1, tilt: f.tilt || 0, alpha: 0.7 });
+    text(Net.friendName(), fx, y + 22, { size: 13, color: scarf, stroke: '#000', strokeW: 3 });
   },
   drawHud() {
     const r = this.r;
@@ -356,7 +360,7 @@ const Space = {
     if (button('⏸', W - 82, 12, 44, 38, { size: 18, color: '#9aa3c0' })) game.modal = makePauseModal();
     if (!game.touch && button(`🔧 Fix (R)`, 208, 16, 92, 26, { size: 13, enabled: this.lost.length > 0 && partCount('wing') > 0 })) this.fixWing();
     // progress to the next planet
-    const p = clamp(this.dist / this.len, 0, 1), x0 = 340, x1 = 760;
+    const p = clamp(this.dist / this.len, 0, 1), x0 = W / 2 - 140, x1 = W / 2 + 280;
     rr(x0, 20, x1 - x0, 14, 7); ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fill();
     rr(x0, 20, (x1 - x0) * p, 14, 7); ctx.fillStyle = '#ffe066'; ctx.fill();
     text(this.leg === 0 ? '🌍' : '🪐', x0 - 14, 27, { size: 16 });
@@ -378,10 +382,17 @@ function makePlanetPrompt(idx) {
       panel(190, y0, 580, 240);
       text(`Land on ${P.name}?`, 480, y0 + 38, { size: 32, color: '#ffe066' });
       wrapText(P.about, 480, y0 + 80, 520, 22, { size: 17 });
-      if (blocked) wrapText(`Your rocket can't go farther. Build a ${ENGINE_NAMES[PLANETS[idx + 1].need]} to reach ${PLANETS[idx + 1].name}!`, 480, y0 + 124, 520, 20, { size: 15, color: '#ffb3b3' });
+      if (blocked) {
+        // the rocket can't keep going, so say exactly what each button does instead of a plain "No"
+        const need = PLANETS[idx + 1].need, eng = PARTS['engine' + need];
+        const cost = Object.entries(eng.cost).map(([k, n]) => `${n} ${MAT_BY_ID[k].icon}`).join(' + ');
+        wrapText(`🔒 To fly on to ${PLANETS[idx + 1].name} you need a ${eng.name} (${cost}).`, 480, y0 + 124, 540, 20, { size: 15, color: '#ffb3b3' });
+      }
       if (last) text('This is the very last planet!', 480, y0 + 124, { size: 16, color: '#ffb3b3' });
-      const yes = button('YES! Land 🛬', 220, y0 + 168, 250, 54, { size: 22, color: '#7bdc6b', hot: '#a4f294' }) || pressed.KeyY;
-      const no = button(blocked || last ? 'No, fly home 🏠' : 'No, keep going 🚀', 490, y0 + 168, 250, 54, { size: 20, color: '#ff8a8a', hot: '#ffb3b3' }) || pressed.KeyN;
+      const yesLabel = blocked ? '🛬 Land here' : 'YES! Land 🛬';
+      const noLabel = blocked || last ? '🏠 Fly home' : 'No, keep going 🚀';
+      const yes = button(yesLabel, 220, y0 + 168, 250, 54, { size: 22, color: '#7bdc6b', hot: '#a4f294' }) || pressed.KeyY;
+      const no = button(noLabel, 490, y0 + 168, 250, 54, { size: 20, color: blocked || last ? '#9fd3ff' : '#ff8a8a', hot: '#ffb3b3' }) || pressed.KeyN;
       if (yes) Space.land(idx);
       else if (no) { if (blocked || last) Space.flyHome(); else Space.skip(); }
     },

@@ -3,6 +3,12 @@
 
 const PlanetScene = {
   stick: true,
+  bg() {   // sky + ground across the full screen width
+    const P = PLANETS[this.idx], g = ctx.createLinearGradient(0, 0, 0, 260);
+    g.addColorStop(0, P.sky[0]); g.addColorStop(1, P.sky[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, CW, 260);
+    ctx.fillStyle = P.ground; ctx.fillRect(0, 240, CW, H);
+  },
   ROCKET: { x: 170, y: 330 },
   enter(arg) {
     const idx = this.idx = arg.idx, P = PLANETS[idx];
@@ -145,6 +151,11 @@ function drawDeco(idx, d, t) {
 // ---------- Planet Evil: you win! ----------
 const Win = {
   stick: true,
+  bg() {
+    const P = PLANETS[PLANETS.length - 1];
+    ctx.fillStyle = P.sky[0]; ctx.fillRect(0, 0, CW, 320);
+    ctx.fillStyle = P.ground; ctx.fillRect(0, 320, CW, H);
+  },
   enter() {
     game.save.won = true;
     const last = PLANETS.length - 1;

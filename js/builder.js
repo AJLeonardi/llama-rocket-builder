@@ -54,6 +54,7 @@ function analyzeRocket(design) {
 function stars3(n) { n = clamp(Math.round(n), 0, 3); return '★'.repeat(n) + '☆'.repeat(3 - n); }
 
 const Builder = {
+  bg: '#1d2238',
   CS: 52, GX: 282, GY: 72,
   enter() {
     this.drag = null;

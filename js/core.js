@@ -1,21 +1,43 @@
 'use strict';
 /* Core: canvas, input (keys + touch), drawing helpers, tap-button UI, effects, sound, saving, scenes. */
 
-const W = 960, H = 600;
+// The game is laid out on a 960x600 stage. On wide screens (phones) the canvas gets wider (CW) so it fills the
+// screen: "wide" scenes use the whole width, the others stay 960 wide in the middle with their background filling the sides.
+const H = 600, BASE_W = 960;
+let W = BASE_W;      // width of the layer being drawn right now
+let CW = BASE_W;     // full canvas width
+const view = { ox: 0 };
 const FONT = '"Arial Rounded MT Bold", "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
-canvas.width = W * DPR;
-canvas.height = H * DPR;
-
+let fitKey = '';
 function fitCanvas() {
-  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
-  canvas.style.width = Math.floor(W * s) + 'px';
+  const vw = document.documentElement.clientWidth || window.innerWidth, vh = window.innerHeight;
+  const key = vw + 'x' + vh;
+  if (key === fitKey) return;
+  fitKey = key;
+  CW = Math.round(clamp(H * vw / vh, BASE_W, 1400));
+  canvas.width = CW * DPR;
+  canvas.height = H * DPR;
+  const s = Math.min(vw / CW, vh / H);
+  canvas.style.width = Math.floor(CW * s) + 'px';
   canvas.style.height = Math.floor(H * s) + 'px';
 }
+// iPhones report the new size a moment after rotating, so check again on several events and every half second.
 window.addEventListener('resize', fitCanvas);
-fitCanvas();
+window.addEventListener('orientationchange', () => setTimeout(fitCanvas, 300));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', fitCanvas);
+setInterval(fitCanvas, 500);
+
+// Switch drawing (and the mouse) to a layer: the full canvas width, or the 960-wide stage centred in it.
+function setLayer(wide) {
+  W = wide ? CW : BASE_W;
+  view.ox = (CW - W) / 2;
+  ctx.setTransform(DPR, 0, 0, DPR, view.ox * DPR, 0);
+  mouse.x = mouse.rx - view.ox;
+  mouse.ux = mouse.urx - view.ox;
+}
 
 // ---------- Game state + scenes ----------
 const game = { scene: null, sceneName: '', modal: null, save: null, t: 0, fade: 0, shake: 0, touch: false };
@@ -66,12 +88,13 @@ window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 // ---------- Pointer (mouse + touch) ----------
-const mouse = { x: -1, y: -1, clicked: false, down: false, released: false };
+// rx/ry = position on the full canvas; x/y = position in the current layer (see setLayer)
+const mouse = { x: -1, y: -1, rx: -1, ry: -1, urx: 0, ux: 0, uy: 0, clicked: false, down: false, released: false };
 const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const STICK_ZONE = R(0, 300, 380, 300);
 function toGame(e) {
   const r = canvas.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  return { x: (e.clientX - r.left) * CW / r.width, y: (e.clientY - r.top) * H / r.height };
 }
 function touchControlsOn() { return game.touch && game.scene && game.scene.stick && !game.modal; }
 canvas.addEventListener('pointerdown', e => {
@@ -93,10 +116,10 @@ function beginInputFrame() {
     if (e.t === 'down') {
       if (mouse.clicked) break;
       clickQueue.shift();
-      mouse.x = e.x; mouse.y = e.y; mouse.clicked = true;
+      mouse.rx = e.x; mouse.y = mouse.ry = e.y; mouse.clicked = true;
     } else {
       clickQueue.shift();
-      mouse.released = true; mouse.ux = e.x; mouse.uy = e.y;
+      mouse.released = true; mouse.urx = e.x; mouse.uy = e.y;
       break;
     }
   }
@@ -104,7 +127,8 @@ function beginInputFrame() {
 canvas.addEventListener('pointermove', e => {
   const p = toGame(e);
   if (e.pointerId === stick.id) { stick.x = p.x; stick.y = p.y; return; }
-  Object.assign(mouse, p);
+  mouse.rx = p.x; mouse.y = mouse.ry = p.y;
+  mouse.x = p.x - view.ox;
 });
 function pointerEnd(e) {
   if (e.pointerId === stick.id) { stick.id = null; return; }
@@ -141,6 +165,9 @@ function drawTouchControls(opts = {}) {
   touchButtons.length = 0;
   touchAction = touchFix = false;
   if (!game.touch || game.modal) return;
+  // drawn on the full canvas (not the stage) so they sit in the real screen corners
+  ctx.save();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   // joystick
   const bx = stick.id !== null ? stick.ox : 110, by = stick.id !== null ? stick.oy : 490;
   ctx.globalAlpha = stick.id !== null ? 0.55 : 0.3;
@@ -151,19 +178,20 @@ function drawTouchControls(opts = {}) {
   circle(bx + a.x * 40, by + a.y * 40, 28);
   ctx.globalAlpha = 1;
   const btns = [];
-  if (opts.action) btns.push({ id: 'action', label: opts.action, x: 870, y: 500, r: 52, color: '#7bdc6b' });
-  if (opts.fix) btns.push({ id: 'fix', label: '🔧', x: opts.action ? 760 : 870, y: 520, r: 42, color: '#ffbf1f' });
+  if (opts.action) btns.push({ id: 'action', label: opts.action, x: CW - 90, y: 500, r: 52, color: '#7bdc6b' });
+  if (opts.fix) btns.push({ id: 'fix', label: '🔧', x: opts.action ? CW - 200 : CW - 90, y: 520, r: 42, color: '#ffbf1f' });
   for (const b of btns) {
     touchButtons.push(b);
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = b.color; circle(b.x, b.y, b.r);
     ctx.globalAlpha = 1;
     text(b.label, b.x, b.y + 2, { size: b.label.length > 2 ? 18 : 30, color: '#1a1a1a' });
-    if (mouse.clicked && !ui.consumed && Math.hypot(mouse.x - b.x, mouse.y - b.y) < b.r) {
+    if (mouse.clicked && !ui.consumed && Math.hypot(mouse.rx - b.x, mouse.ry - b.y) < b.r) {
       ui.consumed = true;
       if (b.id === 'action') touchAction = true; else touchFix = true;
     }
   }
+  ctx.restore();
 }
 
 // ---------- Drawing helpers ----------

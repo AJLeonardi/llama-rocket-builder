@@ -20,8 +20,8 @@ function drawMe(w) { drawLlama(w.x, w.y, { face: w.face, t: w.t, moving: w.movin
 
 function drawInventoryBar(title) {
   const inv = game.save.inv;
-  ctx.fillStyle = 'rgba(8,10,28,.88)'; ctx.fillRect(0, 0, W, 50);
-  ctx.fillStyle = 'rgba(255,191,31,.6)'; ctx.fillRect(0, 50, W, 2);
+  ctx.fillStyle = 'rgba(8,10,28,.88)'; ctx.fillRect(-view.ox, 0, CW, 50);
+  ctx.fillStyle = 'rgba(255,191,31,.6)'; ctx.fillRect(-view.ox, 50, CW, 2);
   let x = 14;
   for (const m of INV_ITEMS) {
     text(m.icon, x + 14, 26, { size: 24 });
@@ -35,6 +35,7 @@ function drawInventoryBar(title) {
 
 const House = {
   stick: true,
+  bg: '#1c1626',
   walls: [
     R(20, 70, 920, 12), R(20, 573, 920, 12), R(20, 70, 12, 515), R(928, 70, 12, 515),
     R(354, 70, 12, 120), R(354, 250, 12, 56),
