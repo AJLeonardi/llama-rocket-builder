@@ -82,6 +82,7 @@ const House = {
     const w = this.me;
     moveWalker(w, dt, this.solids, R(30, 80, 900, 500));
     if (rectsOverlap(footRect(w.x, w.y), this.door)) { Sfx.whoosh(); goTo('bay', { from: 'house' }); return; }
+    Net.sendPos({ scene: 'house', x: w.x, y: w.y, face: w.face, moving: w.moving });
     this.spawnT -= dt;
     if (this.spawnT <= 0 && this.tokens.length < 6) { this.spawnT = 2.5; this.spawnToken(); }
     for (let i = this.tokens.length - 1; i >= 0; i--) {
@@ -122,7 +123,11 @@ const House = {
     for (const wl of this.walls) ctx.fillRect(wl.x, wl.y, wl.w, 3);
     this.drawDoor(t);
     for (const tk of this.tokens) drawToken(tk.x, tk.y + Math.sin(tk.b) * 3, 11);
+    const f = Net.friend, fHere = Net.connected && f && f.scene === 'house' && f.x != null;
+    const friend = () => drawLlama(f.x, f.y, { face: f.face, moving: f.moving, t: game.t, scarf: Net.friendScarf(), label: Net.friendName() });
+    if (fHere && f.y < this.me.y) friend();
     drawMe(this.me);
+    if (fHere && f.y >= this.me.y) friend();
     drawInventoryBar('🏠 Home');
     drawTouchControls();
     if (clickIn(this.door.x, this.door.y, this.door.w, this.door.h)) goTo('bay', { from: 'house' });

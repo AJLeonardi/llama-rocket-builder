@@ -55,7 +55,7 @@ function frame(now) {
   setLayer(!!game.scene.wide);
   if (pressed.KeyM) { Sfx.muted = !Sfx.muted; toast(Sfx.muted ? '🔇 Sound off' : '🔊 Sound on'); }
   if (pressed.Escape && game.modal && game.modal.closable !== false) { game.modal = null; delete pressed.Escape; }
-  if (!game.modal) game.scene.update(dt);
+  if (!game.modal || game.modal.live) game.scene.update(dt);   // 'live' menus (pause while flying together) don't stop the game
   updateParticles(dt);
   Net.tick();
   const sceneNow = game.scene;

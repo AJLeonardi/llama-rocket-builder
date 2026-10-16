@@ -9,6 +9,8 @@ const Launch = {
   wide: true,
   enter(arg) {
     this.startLeg = arg.startLeg || 0;
+    this.speed = arg.speed;
+    this.together = !!arg.together;
     this.a = analyzeRocket(game.save.design);
     this.t = 0; this.alt = 0; this.vel = 0; this.beeps = {};
     this.exploded = false;
@@ -16,6 +18,9 @@ const Launch = {
     if (!this.a.boom && this.a.wobble > 0.7) toast('This rocket looks wobbly... hold on! 🪽', '#ffb3b3');
   },
   rocketY() { return 505 - Math.min(this.alt, 180); },
+  // taking off together: Llama 1 on the left, Llama 2 on the right
+  myX() { return this.together ? W / 2 + (Net.role === 'guest' ? 100 : -100) : W / 2; },
+  friendX() { return W / 2 + (Net.role === 'guest' ? -100 : 100); },
   cam() { return Math.max(0, this.alt - 180); },
   update(dt) {
     this.t += dt;
@@ -41,17 +46,18 @@ const Launch = {
     for (const p of particles) if (p.smoke) p.y += camDelta;
     if (T > 2.6) {
       const sy = this.rocketY() + 6;
-      for (let i = 0; i < 2; i++) particles.push({ x: W / 2 + rand(-24, 24), y: sy, vx: rand(-140, 140), vy: rand(-10, 60), life: rand(0.8, 1.6), max: 1.6, size: rand(8, 18), color: pick(['#ddd', '#bbb', '#fff']), g: -20, smoke: true });
+      for (const x of this.together ? [this.myX(), this.friendX()] : [this.myX()]) particles.push({ x: x + rand(-24, 24), y: sy, vx: rand(-140, 140), vy: rand(-10, 60), life: rand(0.8, 1.6), max: 1.6, size: rand(8, 18), color: pick(['#ddd', '#bbb', '#fff']), g: -20, smoke: true });
     }
-    if (this.alt > 9000 || T > 12) goTo('space', { leg: this.startLeg, warp: this.startLeg > 0 });
+    if (this.alt > 9000 || T > 12) goTo('space', { leg: this.startLeg, warp: this.startLeg > 0, speed: this.speed });
   },
   explode() {
     this.exploded = true;
+    Net.send({ t: 'pos', scene: 'boom' });   // so a friend taking off with us stops drawing our rocket
     Sfx.boom(); game.shake = 22;
     const y = this.rocketY() - 60;
-    burst(W / 2, y, 70, ['#ff5a4e', '#ffd23f', '#ff8c1a', '#fff', '#888'], { speed: 420, life: 1.5 });
-    burst(W / 2, y, 30, [ROCKET_COLORS[game.save.design.color], '#ffd23f'], { speed: 260, size: 2.5, life: 1.8 });
-    for (let i = 0; i < 20; i++) particles.push({ x: W / 2 + rand(-40, 40), y: y + rand(-40, 40), vx: rand(-80, 80), vy: rand(-80, -20), life: 2.5, max: 2.5, size: rand(14, 26), color: '#555', g: -10, smoke: true });
+    burst(this.myX(), y, 70, ['#ff5a4e', '#ffd23f', '#ff8c1a', '#fff', '#888'], { speed: 420, life: 1.5 });
+    burst(this.myX(), y, 30, [ROCKET_COLORS[game.save.design.color], '#ffd23f'], { speed: 260, size: 2.5, life: 1.8 });
+    for (let i = 0; i < 20; i++) particles.push({ x: this.myX() + rand(-40, 40), y: y + rand(-40, 40), vx: rand(-80, 80), vy: rand(-80, -20), life: 2.5, max: 2.5, size: rand(14, 26), color: '#555', g: -10, smoke: true });
   },
   draw() {
     const T = this.t, f = clamp(this.alt / 4500, 0, 1), cam = this.cam();
@@ -74,14 +80,19 @@ const Launch = {
       ctx.fillStyle = '#d9483b'; tri(55, gy - 98, 140, gy - 160, 225, gy - 98);
       ctx.fillStyle = '#7ec8ff'; ctx.fillRect(90, gy - 80, 30, 26); ctx.fillRect(160, gy - 80, 30, 26);
       ctx.fillStyle = '#8b5a2b'; ctx.fillRect(126, gy - 52, 26, 44);
-      ctx.fillStyle = '#5a6278'; ctx.fillRect(W / 2 - 150, gy - 16, 300, 18);
-      ctx.fillStyle = '#ffbf1f'; ctx.fillRect(W / 2 - 150, gy - 16, 300, 4);
+      ctx.fillStyle = '#5a6278'; ctx.fillRect(W / 2 - 180, gy - 16, 360, 18);
+      ctx.fillStyle = '#ffbf1f'; ctx.fillRect(W / 2 - 180, gy - 16, 360, 4);
       ctx.strokeStyle = '#8a92a8'; ctx.lineWidth = 4;
-      for (const tx of [W / 2 + 120, W / 2 + 145]) { ctx.beginPath(); ctx.moveTo(tx, gy - 300); ctx.lineTo(tx, gy - 16); ctx.stroke(); }
+      for (const tx of [W / 2 + 195, W / 2 + 220]) { ctx.beginPath(); ctx.moveTo(tx, gy - 300); ctx.lineTo(tx, gy - 16); ctx.stroke(); }
     }
     if (!this.exploded) {
       const tilt = T > 3.3 ? Math.sin(T * 6) * 0.09 * this.a.wobble : 0;
-      drawRocketDesign(game.save.design, W / 2, this.rocketY(), { s: 26, flame: T > 2.8 ? (T > 3.3 ? 1.4 : 0.5) : 0, tilt });
+      drawRocketDesign(game.save.design, this.myX(), this.rocketY(), { s: 26, flame: T > 2.8 ? (T > 3.3 ? 1.4 : 0.5) : 0, tilt });
+    }
+    const fd = Net.friend && Net.friend.design;
+    if (this.together && fd && designBounds(fd.cells) && Net.friend.scene !== 'boom') {
+      drawRocketDesign(fd, this.friendX(), this.rocketY(), { s: 26, flame: T > 2.8 ? (T > 3.3 ? 1.4 : 0.5) : 0, tilt: T > 3.3 ? Math.sin(T * 6 + 1) * 0.05 : 0 });
+      text(Net.friendName(), this.friendX(), this.rocketY() + 26, { size: 15, color: Net.friendScarf(), stroke: '#000', strokeW: 4 });
     }
     if (T < 3.3 && T >= 0.3) text(String(3 - Math.floor(T - 0.3)), W / 2, 190, { size: 120, color: '#ffe066', stroke: '#000', strokeW: 9 });
     else if (T >= 3.3 && T < 4.8) text(this.a.boom ? 'BOOM!' : 'LIFTOFF!', W / 2, 180, { size: 84, color: this.a.boom ? '#ff5a4e' : '#ffe066', stroke: '#000', strokeW: 9 });
@@ -121,8 +132,9 @@ const Space = {
     this.leg = arg.leg || 0;
     this.design = game.save.design;
     this.a = analyzeRocket(this.design);
-    this.speed = 200 + this.a.tier * 40 + Math.min(2, this.a.speed) * 25;
-    this.r = { x: CW / 2, y: this.BASE_Y, vx: 0, vy: 0, hull: 3, inv: 1.5, crashed: 0, tilt: 0, wt: rand(0, 10), flash: 0 };
+    this.speed = arg.speed || flightSpeed(this.a);   // flying together: both use the slower rocket's speed
+    const startX = Coop.together ? CW / 2 + (Net.role === 'guest' ? 120 : -120) : CW / 2;
+    this.r = { x: startX, y: this.BASE_Y, vx: 0, vy: 0, hull: 3, inv: 1.5, crashed: 0, tilt: 0, wt: rand(0, 10), flash: 0 };
     this.lost = [];
     this.debris = [];
     this.shieldFlash = [0, 0];
@@ -155,18 +167,24 @@ const Space = {
   screenY(wd) { return this.BASE_Y - (wd - this.dist); },
   update(dt) {
     this.st += dt;
-    if (pressed.Escape) { game.modal = makePauseModal(); return; }
+    if (pressed.Escape && !game.modal) { game.modal = makePauseModal(); return; }
     this.scroll += (this.state === 'warp' ? 2500 : this.speed) * dt;
     if (this.state === 'warp' && this.st > 1.5) { this.state = 'fly'; this.st = 0; }
     if (this.state === 'fly' || this.state === 'leave') {
       this.dist += this.speed * dt;
+      // flying together: Llama 2 gently follows Llama 1's distance so the two rockets stay side by side
+      const f = Net.friend;
+      if (Coop.together && Net.role === 'guest' && f && f.scene === 'space' && f.leg === this.leg && f.d != null && this.state === 'fly') {
+        const diff = f.d - this.dist;
+        if (Math.abs(diff) < 1500) this.dist += diff * Math.min(1, dt * 2);
+      }
       if (this.state === 'leave' && this.st > 1.6) { this.state = 'fly'; this.st = 0; }
       if (this.dist >= this.len) { this.state = 'arrive'; this.st = 0; }
     }
     if (this.state === 'arrive' && this.st > 2.2) { this.state = 'prompt'; game.modal = makePlanetPrompt(this.leg); }
     this.updateRocket(dt);
     this.updateThings(dt);
-    Net.sendPos({ scene: 'space', leg: this.leg, dist: this.dist + (this.BASE_Y - this.r.y), nx: this.r.x / W, tilt: this.r.tilt });
+    Net.sendPos({ scene: 'space', leg: this.leg, d: this.dist, dist: this.dist + (this.BASE_Y - this.r.y), nx: this.r.x / W, tilt: this.r.tilt });
   },
   updateRocket(dt) {
     const r = this.r;
@@ -287,6 +305,8 @@ const Space = {
     toast(`Next stop: ${PLANETS[this.leg].name}!`, '#ffe066');
   },
   flyHome() {
+    Coop.cancel();
+    Coop.together = false;
     goTo('bay', { from: 'space' });
     toast('Home sweet home! 🏠', '#ffe066');
   },
@@ -357,7 +377,7 @@ const Space = {
     panel(38, 10, 270, 62, { r: 12 });
     text('❤️'.repeat(Math.max(0, r.hull)) + '🤍'.repeat(3 - Math.max(0, r.hull)), 52, 30, { size: 16, align: 'left' });
     text(`🪽 Wings on: ${this.a.wingsL + this.a.wingsR}   Spares: ${partCount('wing')}`, 52, 55, { size: 14, align: 'left' });
-    if (button('⏸', W - 82, 12, 44, 38, { size: 18, color: '#9aa3c0' })) game.modal = makePauseModal();
+    if (button('⏸', W - 82, 12, 44, 38, { size: 18, color: '#9aa3c0' }) && !game.modal) game.modal = makePauseModal();
     if (!game.touch && button(`🔧 Fix (R)`, 208, 16, 92, 26, { size: 13, enabled: this.lost.length > 0 && partCount('wing') > 0 })) this.fixWing();
     // progress to the next planet
     const p = clamp(this.dist / this.len, 0, 1), x0 = W / 2 - 140, x1 = W / 2 + 280;
@@ -373,6 +393,8 @@ const Space = {
 };
 
 function makePlanetPrompt(idx) {
+  let choice = null;   // 'land' | 'go' | 'home' once this player has picked
+  const act = c => { if (c === 'land') Space.land(idx); else if (c === 'go') Space.skip(); else Space.flyHome(); };
   return {
     closable: false,
     draw() {
@@ -391,18 +413,28 @@ function makePlanetPrompt(idx) {
       if (last) text('This is the very last planet!', 480, y0 + 124, { size: 16, color: '#ffb3b3' });
       const yesLabel = blocked ? '🛬 Land here' : 'YES! Land 🛬';
       const noLabel = blocked || last ? '🏠 Fly home' : 'No, keep going 🚀';
+      const said = { land: 'wants to LAND 🛬', go: 'wants to keep going 🚀', home: 'is flying home 🏠' };
+      const fa = Coop.together && Coop.friendAnswer(idx);
+      if (choice) {
+        const r = Coop.answer(idx, choice);
+        if (r !== 'wait') { act(r); return; }
+        text(`Waiting for ${Net.friendName()} to choose...`, 480, y0 + 195, { size: 20, color: '#9fd3ff' });
+        return;
+      }
+      if (fa) text(`${Net.friendName()} ${said[fa]}`, 480, y0 + 150, { size: 16, color: Net.friendScarf() });
       const yes = button(yesLabel, 220, y0 + 168, 250, 54, { size: 22, color: '#7bdc6b', hot: '#a4f294' }) || pressed.KeyY;
       const no = button(noLabel, 490, y0 + 168, 250, 54, { size: 20, color: blocked || last ? '#9fd3ff' : '#ff8a8a', hot: '#ffb3b3' }) || pressed.KeyN;
-      if (yes) Space.land(idx);
-      else if (no) { if (blocked || last) Space.flyHome(); else Space.skip(); }
+      if (yes) choice = 'land';
+      else if (no) choice = blocked || last ? 'home' : 'go';
     },
   };
 }
 function makePauseModal() {
   return {
+    live: Coop.together,   // flying together: the game keeps going so you don't fall behind
     draw() {
       panel(300, 190, 360, 220);
-      text('PAUSED', 480, 230, { size: 34, color: '#ffe066' });
+      text(Coop.together ? 'MENU' : 'PAUSED', 480, 230, { size: 34, color: '#ffe066' });
       if (button('Keep flying 🚀', 340, 270, 280, 50, { size: 20 })) game.modal = null;
       else if (button('Fly home 🏠', 340, 335, 280, 50, { size: 20, color: '#9fd3ff' })) Space.flyHome();
     },

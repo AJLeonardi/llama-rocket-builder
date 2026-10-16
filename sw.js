@@ -4,7 +4,7 @@ const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'icon.svg', 'js/version.js',
   'js/vendor/qrcode.js', 'js/vendor/jsQR.js',
   'js/core.js', 'js/data.js', 'js/art.js', 'js/house.js', 'js/bay.js', 'js/builder.js',
-  'js/flight.js', 'js/planet.js', 'js/net.js', 'js/main.js',
+  'js/flight.js', 'js/planet.js', 'js/net.js', 'js/coop.js', 'js/main.js',
 ];
 
 self.addEventListener('install', e => {

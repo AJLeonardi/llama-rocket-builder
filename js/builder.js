@@ -178,9 +178,16 @@ const Builder = {
     if (!designBounds(game.save.design.cells)) { toast('Put some parts on the grid first!', '#ffb3b3'); return; }
     const starts = launchStarts();
     if (starts.length > 1) game.modal = makeStartModal(starts);
-    else goTo('launch', { startLeg: 0 });
+    else startFlight(0);
   },
 };
+
+// Take off from Earth: right away when playing alone, or together once the friend presses LAUNCH too.
+function startFlight(leg) {
+  game.modal = null;
+  Coop.ready({ from: 'earth', leg, speed: flightSpeed(analyzeRocket(game.save.design)) },
+    (l, speed, together) => goTo('launch', { startLeg: l, speed, together }));
+}
 
 // Places you can start a flight from: Earth, or any planet you've landed on.
 function launchStarts() {
@@ -200,7 +207,7 @@ function makeStartModal(starts) {
       panel(250, y0, 460, h);
       text('Where do you want to start?', 480, y0 + 36, { size: 24, color: '#ffe066' });
       starts.forEach((s, i) => {
-        if (button(s.label, 290, y0 + 66 + i * 56, 380, 46, { enabled: s.ok !== false, size: 18 })) goTo('launch', { startLeg: s.leg });
+        if (button(s.label, 290, y0 + 66 + i * 56, 380, 46, { enabled: s.ok !== false, size: 18 })) startFlight(s.leg);
       });
       if (button('Cancel', 400, y0 + h - 52, 160, 38, { color: '#9aa3c0', size: 16 })) game.modal = null;
     },

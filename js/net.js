@@ -50,6 +50,7 @@ const Net = {
   },
   onMessage(msg) {
     if (msg.t === 'hello') { if (this.role === 'guest' && msg.seed) this.seed = msg.seed; return; }
+    if (['ready', 'unready', 'go', 'answer'].includes(msg.t)) { Coop.onMessage(msg); return; }
     this.friend = Object.assign(this.friend || {}, msg);
     if (msg.t === 'status' && msg.scene !== 'planet' && msg.scene !== 'space') this.friend.planet = null;
   },
@@ -82,6 +83,7 @@ const Net = {
   dropped() {
     this.connected = false;
     this.friend = null;
+    Coop.dropped();
     toast('Your friend got disconnected. Keep playing solo!', '#ffb3b3');
   },
   waitForIce() {

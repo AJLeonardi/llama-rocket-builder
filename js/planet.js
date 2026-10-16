@@ -83,7 +83,9 @@ const PlanetScene = {
     text(left ? `Stuff left to grab: ${left}` : 'You got everything! ⭐', W / 2, 144, { size: 15, color: '#ffe066', stroke: '#000', strokeW: 4 });
     drawInventoryBar('🪐 ' + P.name);
     const next = this.idx + 1, tier = analyzeRocket(game.save.design).tier, ok = canFlyTo(next, tier);
-    if (button(ok ? `🚀 Fly to ${PLANETS[next].name}` : `🔒 Needs ${ENGINE_NAMES[PLANETS[next].need]}`, W - 330, 470, 310, 52, { enabled: ok, size: 18 })) goTo('space', { leg: next });
+    if (button(ok ? `🚀 Fly to ${PLANETS[next].name}` : `🔒 Needs ${ENGINE_NAMES[PLANETS[next].need]}`, W - 330, 470, 310, 52, { enabled: ok, size: 18 })) {
+      Coop.ready({ from: 'planet', leg: next, speed: flightSpeed(analyzeRocket(game.save.design)) }, (l, speed) => goTo('space', { leg: l, speed }));
+    }
     if (button('🏠 Fly home', W - 330, 530, 310, 48, { color: '#9fd3ff', size: 18 })) Space.flyHome();
     drawTouchControls();
   },
@@ -195,6 +197,8 @@ const Win = {
     drawLlama(500, 440, { s: 1.8, face: -1, fur: '#6b4a7e', fur2: '#523863', crown: true, t, moving: Math.sin(t * 2) > 0.6 });
     panel(330, 232, 320, 74, { r: 14, fill: 'rgba(255,255,255,.95)', stroke: '#6b4a7e' });
     wrapText('"Nooo! You actually made it?! ...Okay fine. YOU WIN!" 👑', 490, 254, 290, 22, { size: 15, color: '#3a1d4a' });
+    const f = Net.friend;
+    if (Net.connected && f && f.scene === 'win' && f.x != null) drawLlama(f.x, f.y, { t, moving: true, scarf: Net.friendScarf(), label: Net.friendName() });
     drawMe(this.me);
     text('YOU MADE IT TO PLANET EVIL!', W / 2, 60, { size: 42, color: '#ffe066', stroke: '#000', strokeW: 8 });
     text('You finished the game! 🏆', W / 2, 108, { size: 26, stroke: '#000', strokeW: 6 });

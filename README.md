@@ -34,7 +34,12 @@ The game saves by itself.
 2. Both tap **🦙🦙 Play Together**. Each screen shows its own QR code and its front camera.
 3. Hold the two screens **facing each other**. They scan each other and connect by themselves.
 
-Rockets can't crash into each other. You fly through the same asteroids, and you meet each other on the planets. Each device keeps its own house, stuff and rocket.
+Once connected you play together:
+
+- **Same house:** you see each other's llama walking around. Each of you has your own Rocket Bay, stuff and rocket.
+- **Take off together:** the first to press LAUNCH waits ("Waiting for Llama 2…") until the other presses LAUNCH too. Then you get one countdown and lift off side by side. There's also a "Go without them" button.
+- **Fly together:** you both fly at the slower rocket's speed through the same asteroids, so you stay side by side. Rockets can't crash into each other.
+- **Planets:** you each pick YES or NO. The first answer waits for the second. If you agree you go together, and if you pick differently you each go your own way. "Fly to the next planet" also waits for both of you.
 
 There's no game server: the devices talk directly to each other over WebRTC, so no internet is needed once the game is loaded. If a device has no camera, open "copy and paste codes" on the pairing screen.
 
