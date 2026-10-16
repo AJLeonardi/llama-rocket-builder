@@ -48,6 +48,10 @@ python3 -m http.server 8000
 
 Then open http://localhost:8000. The camera only works over **https** (or localhost), so put it on GitHub Pages to play on iPhone/iPad. After opening it once, use Share → **Add to Home Screen** and it works offline.
 
+## Versions
+
+Every push to `main` deploys through `.github/workflows/pages.yml`, which stamps the build number (the number of commits) into `js/version.js` and `version.json`. The build number shows in the bottom-right corner. When a newer build is live, the game shows a **"✨ New version! Tap to get it"** button. Locally the build shows as `dev`.
+
 ## Code map
 
 - `js/core.js`: canvas, keyboard/touch input, buttons, sounds, saving
